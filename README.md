@@ -16,13 +16,6 @@ pip install -r requirements.txt
 # Ejecutar la aplicación
 streamlit run app.py
 ```
-
-### Opción 2: Ejecutable Windows (.exe)
-
-1. Descargar `CalculadoraFinanciera.exe`
-2. Doble clic para ejecutar
-3. Se abrirá automáticamente en el navegador
-
 ## 📦 Estructura del Proyecto
 
 ```
@@ -84,19 +77,6 @@ calculadora_financiera/
 5. Ver resultados y gráficas
 6. Exportar a PDF si es necesario
 
-### Ejecutar:
-```bash
-pip install -r requirements.txt
-```
-
-### Puerto en uso
-```bash
-streamlit run app.py 
-
-### Problemas con PDF
-```bash
-pip install --upgrade reportlab
-```
 
 ## 📧 Soporte
 
