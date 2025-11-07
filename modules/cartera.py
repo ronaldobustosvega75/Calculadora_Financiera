@@ -149,10 +149,43 @@ def mostrar_modulo_cartera():
         )
         
         st.plotly_chart(fig, use_container_width=True)
-        img_bytes = io.BytesIO()
-        fig.write_image(img_bytes, format="png")
-        img_bytes.seek(0)
-        st.session_state['cartera_grafico'] = img_bytes.getvalue()
+        
+        # Guardar imagen para reporte con manejo de errores robusto
+        try:
+            img_bytes = io.BytesIO()
+            fig.write_image(img_bytes, format="png", width=1200, height=600)
+            img_bytes.seek(0)
+            st.session_state['cartera_grafico'] = img_bytes.getvalue()
+        except Exception as e:
+            # Fallback: intentar con matplotlib
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib
+                matplotlib.use('Agg')
+                
+                fig_mpl, ax = plt.subplots(figsize=(12, 6))
+                ax.plot(df['Periodo'], df['Total Aportes'], label='Aportes Acumulados', 
+                        linewidth=2, color='#636EFA')
+                ax.plot(df['Periodo'], df['Saldo'], label='Saldo Total', 
+                        linewidth=3, color='#00CC96')
+                ax.fill_between(df['Periodo'], df['Total Aportes'], df['Saldo'], 
+                                alpha=0.3, color='#00CC96')
+                ax.set_xlabel('Periodo', fontsize=12)
+                ax.set_ylabel('Monto (USD)', fontsize=12)
+                ax.set_title('Evolución de la Inversión', fontsize=14, fontweight='bold')
+                ax.legend(fontsize=10)
+                ax.grid(True, alpha=0.3)
+                ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+                
+                img_bytes = io.BytesIO()
+                plt.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+                img_bytes.seek(0)
+                st.session_state['cartera_grafico'] = img_bytes.getvalue()
+                plt.close()
+            except Exception as e2:
+                # Si ambos fallan, no guardar imagen pero continuar
+                st.session_state['cartera_grafico'] = None
+                # No mostrar warning aquí para no confundir al usuario
         
         with st.expander("📋 Ver Tabla Detallada"):
             st.dataframe(df, use_container_width=True, hide_index=True)
