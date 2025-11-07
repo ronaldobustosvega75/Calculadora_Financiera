@@ -152,26 +152,31 @@ elif pagina == "📄 Exportar":
     tiene_datos = False
     datos_incluir = []
     
-    if 'cartera_saldo_final' in st.session_state:
+    # Verificar disponibilidad segura
+    cartera_ok = 'cartera_saldo_final' in st.session_state and 'cartera_params' in st.session_state
+    jubilacion_ok = 'jubilacion_data' in st.session_state
+    bono_ok = 'bono_vp' in st.session_state and 'bono_params' in st.session_state
+    
+    if cartera_ok:
         st.success("✅ Datos de Cartera disponibles")
         datos_incluir.append("Cartera")
         tiene_datos = True
     else:
-        st.warning("⚠️ No hay datos de Cartera — ve al Módulo A")
+        st.warning("⚠️ Datos incompletos de Cartera — requiere ejecutar el cálculo nuevamente")
     
-    if 'jubilacion_data' in st.session_state:
+    if jubilacion_ok:
         st.success("✅ Datos de Jubilación disponibles")
         datos_incluir.append("Jubilación")
         tiene_datos = True
     else:
-        st.warning("⚠️ No hay datos de Jubilación — ve al Módulo B")
+        st.warning("⚠️ Datos incompletos de Jubilación — requiere ejecutar el cálculo nuevamente")
     
-    if 'bono_vp' in st.session_state:
+    if bono_ok:
         st.success("✅ Datos de Bonos disponibles")
         datos_incluir.append("Bonos")
         tiene_datos = True
     else:
-        st.warning("⚠️ No hay datos de Bonos — ve al Módulo C")
+        st.warning("⚠️ Datos incompletos de Bonos — requiere ejecutar el cálculo nuevamente")
     
     st.markdown("---")
     
@@ -180,69 +185,73 @@ elif pagina == "📄 Exportar":
         
         if st.button("📥 Generar y Descargar PDF", type="primary", use_container_width=True):
             with st.spinner("📊 Generando reporte profesional..."):
-                # === CARGAR DATOS DE CARTERA (con df y gráfico) ===
-                datos_cartera = None
-                if 'cartera_saldo_final' in st.session_state:
-                    datos_cartera = {
-                        'monto_inicial': st.session_state['cartera_params']['monto_inicial'],
-                        'aporte_periodico': st.session_state['cartera_params']['aporte_periodico'],
-                        'tea': st.session_state['cartera_params']['tea'],
-                        'anos': st.session_state['cartera_params']['anos'],
-                        'frecuencia': st.session_state['cartera_params']['frecuencia'],
-                        'saldo_final': st.session_state['cartera_saldo_final'],
-                        'total_aportes': st.session_state['cartera_total_aportes']
-                    }
-                    # ✅ CLAVE: incluir el DataFrame y gráfico
-                    if 'cartera_df' in st.session_state:
-                        datos_cartera['df'] = st.session_state['cartera_df']
-                    if 'cartera_grafico' in st.session_state:
-                        datos_cartera['grafico'] = st.session_state['cartera_grafico']
-                
-                # === CARGAR DATOS DE JUBILACIÓN (con df y gráfico) ===
-                datos_jubilacion = None
-                if 'jubilacion_data' in st.session_state:
-                    datos_jubilacion = st.session_state['jubilacion_data'].copy()
-                    # ✅ Añadir df si existe (aunque no lo usas en cálculo, lo guardas para futuro)
-                    if 'jubilacion_df' in st.session_state:
-                        datos_jubilacion['df'] = st.session_state['jubilacion_df']
-                    if 'jubilacion_grafico' in st.session_state:
-                        datos_jubilacion['grafico'] = st.session_state['jubilacion_grafico']
-                
-                # === CARGAR DATOS DE BONOS (con df y gráfico) ===
-                datos_bono = None
-                if 'bono_vp' in st.session_state:
-                    datos_bono = {
-                        'valor_nominal': st.session_state['bono_params']['valor_nominal'],
-                        'tasa_cupon': st.session_state['bono_params']['tasa_cupon'],
-                        'frecuencia_pago': st.session_state['bono_params']['frecuencia_pago'],
-                        'anos': st.session_state['bono_params']['anos'],
-                        'tea_mercado': st.session_state['bono_params']['tea_mercado'],
-                        'vp_total': st.session_state['bono_vp']
-                    }
-                    # ✅ CLAVE: incluir el DataFrame y gráfico
-                    if 'bono_df' in st.session_state:
-                        datos_bono['df'] = st.session_state['bono_df']
-                    if 'bono_grafico' in st.session_state:
-                        datos_bono['grafico'] = st.session_state['bono_grafico']
-                
-                # Generar PDF con TODOS los datos (incluyendo df)
                 try:
-                    pdf_buffer = generar_pdf_reporte(datos_cartera, datos_jubilacion, datos_bono)
+                    # === CARGAR DATOS DE CARTERA ===
+                    datos_cartera = None
+                    if cartera_ok:
+                        p = st.session_state['cartera_params']
+                        datos_cartera = {
+                            'monto_inicial': p.get('monto_inicial', 0.0),
+                            'aporte_periodico': p.get('aporte_periodico', 0.0),
+                            'tea': p.get('tea', 0.0),
+                            'anos': p.get('anos', 0),
+                            'frecuencia': p.get('frecuencia', 'Mensual'),
+                            'saldo_final': st.session_state.get('cartera_saldo_final', 0.0),
+                            'total_aportes': st.session_state.get('cartera_total_aportes', 0.0)
+                        }
+                        # Incluir df y gráfico si existen
+                        if 'cartera_df' in st.session_state:
+                            datos_cartera['df'] = st.session_state['cartera_df']
+                        if 'cartera_grafico' in st.session_state:
+                            datos_cartera['grafico'] = st.session_state['cartera_grafico']
+                
+                    # === CARGAR DATOS DE JUBILACIÓN ===
+                    datos_jubilacion = None
+                    if jubilacion_ok:
+                        datos_jubilacion = st.session_state['jubilacion_data'].copy()
+                        if 'jubilacion_grafico' in st.session_state:
+                            datos_jubilacion['grafico'] = st.session_state['jubilacion_grafico']
+                        # Nota: jubilación no usa 'df' actualmente, pero si lo agregas, aquí va
+                
+                    # === CARGAR DATOS DE BONOS ===
+                    datos_bono = None
+                    if bono_ok:
+                        p = st.session_state['bono_params']
+                        datos_bono = {
+                            'valor_nominal': p.get('valor_nominal', 1000.0),
+                            'tasa_cupon': p.get('tasa_cupon', 0.0),
+                            'frecuencia_pago': p.get('frecuencia_pago', 'Anual'),
+                            'anos': p.get('anos', 10),
+                            'tea_mercado': p.get('tea_mercado', 0.0),
+                            'vp_total': st.session_state.get('bono_vp', 0.0)
+                        }
+                        if 'bono_df' in st.session_state:
+                            datos_bono['df'] = st.session_state['bono_df']
+                        if 'bono_grafico' in st.session_state:
+                            datos_bono['grafico'] = st.session_state['bono_grafico']
+                
+                    # ✅ AHORA SÍ: Llamar al generador de PDF
+                    pdf_buffer = generar_pdf_reporte(
+                        datos_cartera, 
+                        datos_jubilacion, 
+                        datos_bono
+                    )
                     
                     st.download_button(
-                        label="📄 Descargar Reporte PDF (Profesional)",
+                        label="📄 Descargar Reporte PDF",
                         data=pdf_buffer,
                         file_name="Reporte_Financiero_Integral.pdf",
                         mime="application/pdf",
-                        use_container_width=True,
-                        type="primary"
+                        use_container_width=True
                     )
                     
-                    st.success("✅ Reporte profesional generado con éxito")
+                    st.success("✅ ¡Reporte generado con éxito!")
                     st.balloons()
+                    
                 except Exception as e:
-                    st.error(f"❌ Error al generar el PDF: {str(e)}")
-                    st.exception(e)  # Para debugging
+                    st.error(f"❌ Error al generar el PDF: {type(e).__name__}")
+                    st.code(str(e))
+                    st.warning("💡 Recomendación: Ejecuta nuevamente los cálculos en cada módulo y luego intenta exportar.")
     else:
-        st.error("❌ No hay datos para exportar")
-        st.info("💡 Completa al menos un módulo (A, B o C) para generar el reporte")
+        st.error("❌ No hay datos completos para exportar")
+        st.info("📌 Ve a los módulos (📊 Cartera, 💰 Jubilación, 📈 Bonos), ejecuta los cálculos y regresa aquí.")
