@@ -1,440 +1,434 @@
-from reportlab.lib.pagesizes import letter, A4
+# utils/exportar.py (reemplaza tu versión actual)
+from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle, Paragraph, 
-                                Spacer, PageBreak, Image, KeepTogether)
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph,
+    Spacer, PageBreak, Image, KeepTogether, Frame, PageTemplate
+)
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from datetime import datetime
 import io
 import pandas as pd
-
+import base64
 
 def generar_pdf_reporte(datos_cartera, datos_jubilacion, datos_bono=None):
-    """Genera un PDF con el reporte completo en estilo profesional"""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer, 
+        buffer,
         pagesize=letter,
-        rightMargin=50,
-        leftMargin=50,
-        topMargin=40,
-        bottomMargin=40
+        rightMargin=50, leftMargin=50,
+        topMargin=50, bottomMargin=50
     )
     elements = []
     styles = getSampleStyleSheet()
-    
-    # ============== ESTILOS PERSONALIZADOS ==============
+
+    # ======== ESTILOS PERSONALIZADOS (mejorados) ========
     title_style = ParagraphStyle(
         'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#1A5490'),
-        spaceAfter=8,
+        fontSize=26,
+        textColor=colors.HexColor('#0D4A6B'),
+        spaceAfter=12,
         alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
+        fontName='Helvetica-Bold',
+        leading=32
     )
     
     subtitle_style = ParagraphStyle(
         'Subtitle',
-        parent=styles['Normal'],
         fontSize=11,
-        textColor=colors.HexColor('#5D6D7E'),
+        textColor=colors.HexColor('#6C757D'),
         alignment=TA_CENTER,
-        spaceAfter=20
+        spaceAfter=20,
+        fontName='Helvetica'
     )
     
     section_style = ParagraphStyle(
         'SectionTitle',
-        parent=styles['Heading2'],
-        fontSize=16,
+        fontSize=15,
         textColor=colors.white,
-        spaceAfter=15,
-        spaceBefore=25,
+        spaceAfter=12,
+        spaceBefore=20,
         fontName='Helvetica-Bold',
-        backColor=colors.HexColor('#1A5490'),
-        borderPadding=8,
+        backColor=colors.HexColor('#0D4A6B'),
+        borderPadding=(10, 8),
         alignment=TA_LEFT
     )
     
-    subsection_style = ParagraphStyle(
-        'SubsectionTitle',
-        parent=styles['Heading3'],
-        fontSize=12,
-        textColor=colors.HexColor('#2C3E50'),
-        spaceAfter=10,
-        spaceBefore=15,
-        fontName='Helvetica-Bold'
+    insight_style = ParagraphStyle(
+        'InsightBox',
+        fontSize=10,
+        textColor=colors.HexColor('#1F2937'),
+        backColor=colors.HexColor('#F0F9FF'),
+        borderColor=colors.HexColor('#E0F2FE'),
+        borderWidth=1,
+        borderPadding=(10, 8),
+        borderRadius=6,
+        spaceAfter=15,
+        fontName='Helvetica',
+        leading=14
     )
     
     description_style = ParagraphStyle(
         'Description',
-        parent=styles['Normal'],
         fontSize=10,
-        textColor=colors.HexColor('#34495E'),
+        textColor=colors.HexColor('#374151'),
         alignment=TA_JUSTIFY,
-        spaceAfter=10
+        spaceAfter=12,
+        fontName='Helvetica',
+        leading=14
     )
-    
-    # ============== ENCABEZADO DEL REPORTE ==============
-    elements.append(Paragraph("REPORTE DE PROYECCIÓN FINANCIERA", title_style))
+
+    # ======== PORTADA ========
+    elements.append(Spacer(1, 0.5*inch))
+    elements.append(Paragraph("📊 REPORTE FINANCIERO INTEGRAL", title_style))
     elements.append(Paragraph(
-        f"Análisis Integral de Inversión y Jubilación<br/>"
-        f"Generado el {datetime.now().strftime('%d de %B del %Y a las %H:%M')}", 
+        f"<b>Análisis de Cartera, Jubilación y Valoración de Bonos</b><br/>"
+        f"Generado el <b>{datetime.now().strftime('%d de %B de %Y')}</b> a las <b>{datetime.now().strftime('%H:%M')}</b>",
         subtitle_style
     ))
-    elements.append(Spacer(1, 0.3*inch))
     
-    # Línea separadora
-    line = Table([['']], colWidths=[7*inch])
-    line.setStyle(TableStyle([
-        ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#1A5490')),
+    # Línea de firma
+    line_data = [['']]
+    line_table = Table(line_data, colWidths=[6.5*inch])
+    line_table.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,0), 2, colors.HexColor('#0D4A6B')),
+        ('TOPPADDING', (0,0), (-1,0), 10),
     ]))
-    elements.append(line)
-    elements.append(Spacer(1, 0.2*inch))
-    
-    # ============== MÓDULO A: PROYECCIÓN DE CARTERA ==============
+    elements.append(line_table)
+    elements.append(Spacer(1, 0.3*inch))
+
+    elements.append(Paragraph(
+        "Este documento presenta un análisis cuantitativo y cualitativo de tus proyecciones financieras, "
+        "diseñado para apoyar la toma de decisiones estratégicas con base en principios de finanzas modernas.",
+        description_style
+    ))
+    elements.append(Spacer(1, 0.4*inch))
+
+    # ======== RESUMEN EJECUTIVO (si hay datos) ========
+    resumen_items = []
     if datos_cartera:
-        elements.append(Paragraph("📊 MÓDULO A: CRECIMIENTO DE CARTERA", section_style))
-        elements.append(Spacer(1, 0.15*inch))
+        resumen_items.append(f"• Cartera: <b>${datos_cartera['saldo_final']:,.0f}</b> en {datos_cartera['anos']} años")
+    if datos_jubilacion:
+        resumen_items.append(f"• Jubilación: pensión de <b>${datos_jubilacion['pension_mensual']:,.0f}/mes</b>")
+    if datos_bono:
+        diff_pct = (datos_bono['vp_total'] - datos_bono['valor_nominal']) / datos_bono['valor_nominal'] * 100
+        estado = "sobrevaluado" if diff_pct > 0 else "subvaluado" if diff_pct < 0 else "a la par"
+        resumen_items.append(f"• Bono: valor presente <b>${datos_bono['vp_total']:,.0f}</b> ({estado})")
+
+    if resumen_items:
+        elements.append(Paragraph("<b>🔍 Resumen Ejecutivo</b>", section_style))
+        resumen_texto = "<br/>".join(resumen_items)
+        elements.append(Paragraph(resumen_texto, description_style))
+        elements.append(Spacer(1, 0.3*inch))
+
+    # ======== MÓDULO A: CARTERA ========
+    if datos_cartera:
+        elements.append(Paragraph("📈 MÓDULO 1: PROYECCIÓN DE CRECIMIENTO DE CARTERA", section_style))
         
-        # Descripción
-        desc = (
-            f"Esta proyección muestra cómo tu inversión inicial de "
-            f"<b>${datos_cartera['monto_inicial']:,.2f}</b> crecerá durante "
-            f"<b>{datos_cartera['anos']} años</b> con aportes {datos_cartera.get('frecuencia', 'periódicos').lower()}s de "
-            f"<b>${datos_cartera['aporte_periodico']:,.2f}</b> y una tasa efectiva anual (TEA) del "
-            f"<b>{datos_cartera['tea']:.2f}%</b>."
-        )
-        elements.append(Paragraph(desc, description_style))
-        elements.append(Spacer(1, 0.15*inch))
+        # Contexto
+        elements.append(Paragraph(
+            "Esta sección modela el crecimiento de tu inversión mediante <b>capitalización compuesta</b>. "
+            "El rendimiento final depende no solo de la tasa de interés, sino también de la disciplina en "
+            "los aportes periódicos y del horizonte temporal —el mayor aliado del interés compuesto.",
+            description_style
+        ))
+
+        # Tabla resumen (mejorada)
+        total_aportes = datos_cartera['total_aportes']
+        ganancia = datos_cartera['saldo_final'] - total_aportes
+        rentabilidad = (ganancia / total_aportes * 100) if total_aportes > 0 else 0
         
-        # Tabla de resumen
-        ganancia = datos_cartera['saldo_final'] - datos_cartera['total_aportes']
-        rentabilidad = (ganancia / datos_cartera['total_aportes'] * 100) if datos_cartera['total_aportes'] > 0 else 0
-        
-        info = [
-            ['Concepto', 'Monto', 'Detalle'],
-            ['Monto Inicial', f"${datos_cartera['monto_inicial']:,.2f}", 'Capital de inicio'],
-            ['Aporte Periódico', f"${datos_cartera['aporte_periodico']:,.2f}", f"Frecuencia: {datos_cartera.get('frecuencia', 'Mensual')}"],
-            ['TEA Aplicada', f"{datos_cartera['tea']:.2f}%", 'Tasa efectiva anual'],
-            ['Plazo de Inversión', f"{datos_cartera['anos']} años", f"{datos_cartera['anos'] * 12} meses"],
-            ['Total Aportado', f"${datos_cartera['total_aportes']:,.2f}", 'Capital + aportes acumulados'],
-            ['Ganancia por Intereses', f"${ganancia:,.2f}", f"Rentabilidad: {rentabilidad:.1f}%"],
-            ['SALDO FINAL', f"${datos_cartera['saldo_final']:,.2f}", 'Capital total proyectado'],
+        resumen_cartera = [
+            ['Parámetro', 'Valor'],
+            ['Inversión Inicial', f"${datos_cartera['monto_inicial']:,.2f}"],
+            ['Aporte Mensual', f"${datos_cartera['aporte_periodico']:,.2f}"],
+            ['Plazo', f"{datos_cartera['anos']} años ({datos_cartera['anos']*12} meses)"],
+            ['TEA', f"{datos_cartera['tea']:.2f}%"],
+            ['Total Aportado', f"${total_aportes:,.2f}"],
+            ['Ganancia Neta', f"${ganancia:,.2f} ({rentabilidad:+.1f}%)"],
+            ['<b>SALDO FINAL</b>', f"<b>${datos_cartera['saldo_final']:,.2f}</b>"],
         ]
         
-        t = Table(info, colWidths=[2.3*inch, 1.8*inch, 2.7*inch])
-        t.setStyle(TableStyle([
-            # Encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495E')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            # Contenido
-            ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-            ('TEXTCOLOR', (0, 1), (-1, -2), colors.HexColor('#2C3E50')),
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'),
-            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -2), 9),
-            # Fila final destacada
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#D5F4E6')),
-            ('TEXTCOLOR', (0, -1), (-1, -1), colors.HexColor('#0E6655')),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, -1), (-1, -1), 11),
-            # Bordes y padding
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-            ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#1A5490')),
-            ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor('#0E6655')),
-            # Alternar colores de fila
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F9FA')]),
+        t_resumen = Table(resumen_cartera, colWidths=[3*inch, 2.8*inch])
+        t_resumen.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#E3F2FD')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#0D4A6B')),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+            ('FONTSIZE', (0,1), (-1,-1), 9),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#BBDEFB')),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#BBDEFB')),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (0,-1), (-1,-1), colors.HexColor('#0D4A6B')),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ]))
-        elements.append(t)
-        elements.append(Spacer(1, 0.25*inch))
-        
-        # Gráfico si está disponible
-        if 'grafico' in datos_cartera and datos_cartera['grafico'] is not None:
-            elements.append(Paragraph("Evolución de la Inversión", subsection_style))
-            try:
-                img = io.BytesIO(datos_cartera['grafico'])
-                elements.append(Image(img, width=6*inch, height=3.3*inch))
-            except:
-                elements.append(Paragraph("<i>Gráfico no disponible</i>", description_style))
-            elements.append(Spacer(1, 0.2*inch))
-        
-        # Tabla detallada (primeras 5 y últimas 5 filas)
-        if 'df' in datos_cartera and datos_cartera['df'] is not None:
-            elements.append(Paragraph("Detalle de Periodos (Primeros y Últimos 5)", subsection_style))
-            
-            df = datos_cartera['df']
-            if len(df) > 10:
-                df_mostrar = pd.concat([df.head(5), df.tail(5)])
-                elementos_omitidos = len(df) - 10
-            else:
-                df_mostrar = df
-                elementos_omitidos = 0
-            
-            # Preparar datos para la tabla
-            tabla_data = [['Periodo', 'Aporte', 'Interés', 'Saldo']]
-            for _, row in df_mostrar.iterrows():
-                tabla_data.append([
-                    f"{int(row['Periodo'])}",
-                    f"${row['Aporte']:,.0f}",
-                    f"${row['Interes']:,.0f}",
-                    f"${row['Saldo']:,.0f}"
-                ])
-            
-            # Agregar fila de puntos suspensivos si hay elementos omitidos
-            if elementos_omitidos > 0:
-                pos_insert = 6  # Después de las primeras 5 + encabezado
-                tabla_data.insert(pos_insert, ['...', '...', '...', '...'])
-            
-            t_detalle = Table(tabla_data, colWidths=[1*inch, 1.6*inch, 1.6*inch, 1.8*inch])
-            t_detalle.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#5DADE2')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#EBF5FB')]),
-            ]))
-            elements.append(t_detalle)
-            
-            if elementos_omitidos > 0:
-                elements.append(Spacer(1, 0.1*inch))
-                elements.append(Paragraph(
-                    f"<i>Se omitieron {elementos_omitidos} periodos intermedios para mantener el reporte conciso.</i>",
-                    description_style
-                ))
-        
-        elements.append(PageBreak())
-    
-    # ============== MÓDULO B: PROYECCIÓN DE JUBILACIÓN ==============
-    if datos_jubilacion:
-        elements.append(Paragraph("💰 MÓDULO B: PROYECCIÓN DE JUBILACIÓN", section_style))
-        elements.append(Spacer(1, 0.15*inch))
-        
-        # Descripción
-        tipo_impuesto_texto = "fuente extranjera (29.5%)" if datos_jubilacion.get('tipo_impuesto') == 'extranjera' else "bolsa local (5%)"
-        desc = (
-            f"Este análisis calcula tu pensión mensual considerando un capital acumulado de "
-            f"<b>${datos_jubilacion['capital_bruto']:,.2f}</b>, aplicando impuestos por inversión de {tipo_impuesto_texto}. "
-        )
-        if datos_jubilacion.get('opcion_retiro') == 'Pensión Mensual':
-            desc += (
-                f"Recibirás una pensión mensual de <b>${datos_jubilacion['pension_mensual']:,.2f}</b> "
-                f"durante <b>{datos_jubilacion.get('anos_retiro', 'N/A')} años</b>."
+        elements.append(t_resumen)
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Insight
+        if rentabilidad > 100:
+            insight = (
+                "<b>💡 Hallazgo clave:</b> Más del 50% de tu capital final proviene del interés compuesto, "
+                "no de tus aportes. Esto ilustra el poder de comenzar temprano y mantener la disciplina."
             )
         else:
-            desc += "Optaste por un <b>cobro total</b> en un solo pago."
-        
-        elements.append(Paragraph(desc, description_style))
-        elements.append(Spacer(1, 0.15*inch))
-        
-        # Tabla de resumen
-        tasa_impuesto = (datos_jubilacion['impuesto'] / datos_jubilacion['ganancia'] * 100) if datos_jubilacion['ganancia'] > 0 else 0
-        
-        info = [
-            ['Concepto', 'Monto', 'Detalle'],
-            ['Capital Bruto', f"${datos_jubilacion['capital_bruto']:,.2f}", 'Saldo total antes de impuestos'],
-            ['Total Aportado', f"${datos_jubilacion['total_aportes']:,.2f}", 'Suma de tus inversiones'],
-            ['Ganancia Generada', f"${datos_jubilacion['ganancia']:,.2f}", 'Rendimiento de tu inversión'],
-            ['Impuesto a la Renta', f"${datos_jubilacion['impuesto']:,.2f}", f"Tasa: {tasa_impuesto:.2f}% sobre ganancia"],
-            ['CAPITAL NETO', f"${datos_jubilacion['capital_neto']:,.2f}", 'Disponible para retiro'],
-        ]
-        
-        if datos_jubilacion.get('opcion_retiro') == 'Pensión Mensual':
-            info.append(['Pensión Mensual', f"${datos_jubilacion['pension_mensual']:,.2f}", 
-                        f"Durante {datos_jubilacion.get('anos_retiro', 'N/A')} años"])
-            info.append(['Total a Recibir', f"${datos_jubilacion['pension_mensual'] * datos_jubilacion.get('anos_retiro', 0) * 12:,.2f}", 
-                        f"{datos_jubilacion.get('anos_retiro', 0) * 12} pagos mensuales"])
-        
-        t = Table(info, colWidths=[2.3*inch, 1.8*inch, 2.7*inch])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495E')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#2C3E50')),
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('BACKGROUND', (0, -2), (-1, -1), colors.HexColor('#FCF3CF')),
-            ('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-            ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#1A5490')),
-            ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor('#F39C12')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -3), [colors.white, colors.HexColor('#F8F9FA')]),
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 0.25*inch))
-        
-        # Gráfico si está disponible
-        if 'grafico' in datos_jubilacion and datos_jubilacion['grafico'] is not None:
-            elements.append(Paragraph("Proyección de Retiro Mensual", subsection_style))
+            insight = (
+                "<b>🔍 Observación:</b> Aumentar el plazo o la tasa de retorno tendría un impacto exponencial. "
+                "Por ejemplo, extender 5 años más podría incrementar tu saldo final en +25%."
+            )
+        elements.append(Paragraph(insight, insight_style))
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Gráfico
+        if 'grafico' in datos_cartera and datos_cartera['grafico']:
             try:
-                img = io.BytesIO(datos_jubilacion['grafico'])
-                elements.append(Image(img, width=6*inch, height=3.3*inch))
-            except:
-                elements.append(Paragraph("<i>Gráfico no disponible</i>", description_style))
-            elements.append(Spacer(1, 0.2*inch))
-        
-        elements.append(PageBreak())
-    
-    # ============== MÓDULO C: VALORACIÓN DE BONOS ==============
-    if datos_bono:
-        elements.append(Paragraph("📈 MÓDULO C: VALORACIÓN DE BONOS", section_style))
-        elements.append(Spacer(1, 0.15*inch))
-        
-        # Descripción
-        diferencia = datos_bono['vp_total'] - datos_bono['valor_nominal']
-        estado = "sobrevaluado" if diferencia > 0 else "subvaluado" if diferencia < 0 else "a la par"
-        
-        desc = (
-            f"Este análisis valora un bono con valor nominal de <b>${datos_bono['valor_nominal']:,.2f}</b>, "
-            f"tasa de cupón del <b>{datos_bono['tasa_cupon']:.2f}%</b> y plazo de <b>{datos_bono['anos']} años</b>. "
-            f"El valor presente calculado es <b>${datos_bono['vp_total']:,.2f}</b>, lo que indica que el bono está "
-            f"<b>{estado}</b> ({diferencia:+,.2f} respecto al valor nominal)."
-        )
-        elements.append(Paragraph(desc, description_style))
-        elements.append(Spacer(1, 0.15*inch))
-        
-        # Tabla de resumen
-        porcentaje_dif = (diferencia / datos_bono['valor_nominal'] * 100)
-        
-        info = [
-            ['Concepto', 'Valor', 'Detalle'],
-            ['Valor Nominal', f"${datos_bono['valor_nominal']:,.2f}", 'Valor facial del bono'],
-            ['Tasa de Cupón', f"{datos_bono['tasa_cupon']:.2f}%", f"Frecuencia: {datos_bono.get('frecuencia_pago', 'Anual')}"],
-            ['Plazo del Bono', f"{datos_bono['anos']} años", 'Tiempo hasta vencimiento'],
-            ['TEA de Mercado', f"{datos_bono.get('tea_mercado', 'N/A')}%", 'Tasa de descuento aplicada'],
-            ['VALOR PRESENTE', f"${datos_bono['vp_total']:,.2f}", f"Diferencia: {porcentaje_dif:+.2f}%"],
-            ['Estado', estado.upper(), 'Interpretación del precio'],
-        ]
-        
-        t = Table(info, colWidths=[2.3*inch, 1.8*inch, 2.7*inch])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495E')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-            ('TEXTCOLOR', (0, 1), (-1, -2), colors.HexColor('#2C3E50')),
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'),
-            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -2), 9),
-            ('BACKGROUND', (0, -2), (-1, -1), colors.HexColor('#E8DAEF')),
-            ('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-            ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#1A5490')),
-            ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor('#8E44AD')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -3), [colors.white, colors.HexColor('#F8F9FA')]),
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 0.25*inch))
-        
-        # Gráfico si está disponible
-        if 'grafico' in datos_bono and datos_bono['grafico'] is not None:
-            elements.append(Paragraph("Flujos de Caja del Bono", subsection_style))
-            try:
-                img = io.BytesIO(datos_bono['grafico'])
-                elements.append(Image(img, width=6*inch, height=3.3*inch))
-            except:
-                elements.append(Paragraph("<i>Gráfico no disponible</i>", description_style))
-            elements.append(Spacer(1, 0.2*inch))
-        
-        # Tabla de flujos detallada
-        if 'df' in datos_bono and datos_bono['df'] is not None:
-            elements.append(Paragraph("Detalle de Flujos de Caja (Primeros y Últimos 5)", subsection_style))
+                img = Image(io.BytesIO(datos_cartera['grafico']), width=6.2*inch, height=2.8*inch)
+                elements.append(Paragraph("Evolución del Capital (Aportes vs Intereses)", description_style))
+                elements.append(img)
+                elements.append(Spacer(1, 0.2*inch))
+            except Exception as e:
+                elements.append(Paragraph(f"<i>⚠️ Error al cargar gráfico: {str(e)}</i>", description_style))
+
+        # Tabla detallada de flujos (si existe df)
+        if 'df' in datos_cartera and isinstance(datos_cartera['df'], pd.DataFrame) and not datos_cartera['df'].empty:
+            elements.append(Paragraph("Detalle de los Primeros y Últimos Periodos", description_style))
             
-            df = datos_bono['df']
-            if len(df) > 10:
-                df_mostrar = pd.concat([df.head(5), df.tail(5)])
-                elementos_omitidos = len(df) - 10
+            df = datos_cartera['df']
+            if len(df) > 12:
+                df_show = pd.concat([df.head(6), df.tail(6)])
+                omitidos = len(df) - 12
             else:
-                df_mostrar = df
-                elementos_omitidos = 0
+                df_show = df
+                omitidos = 0
             
-            tabla_data = [['Periodo', 'Flujo', 'Factor Desc.', 'VP Flujo']]
-            for _, row in df_mostrar.iterrows():
-                tabla_data.append([
-                    f"{int(row['Periodo'])}",
-                    f"${row['Flujo']:,.2f}",
-                    f"{row.get('Factor', 0):.4f}" if 'Factor' in row else "N/A",
-                    f"${row['VP Flujo']:,.2f}"
+            # Formatear tabla
+            data = [['Periodo', 'Aporte', 'Interés', 'Saldo Acumulado']]
+            for _, r in df_show.iterrows():
+                data.append([
+                    str(int(r['Periodo'])),
+                    f"${r['Aporte']:,.0f}",
+                    f"${r['Interes']:,.0f}",
+                    f"${r['Saldo']:,.0f}"
                 ])
             
-            if elementos_omitidos > 0:
-                pos_insert = 6
-                tabla_data.insert(pos_insert, ['...', '...', '...', '...'])
+            if omitidos > 0:
+                data.insert(7, ['…', '…', '…', '…'])
             
-            t_detalle = Table(tabla_data, colWidths=[1*inch, 1.5*inch, 1.5*inch, 1.8*inch])
+            t_detalle = Table(data, colWidths=[1*inch, 1.7*inch, 1.7*inch, 2.4*inch])
             t_detalle.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#A569BD')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F4ECF7')]),
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0D4A6B')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 9),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
+                ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+                ('FONTSIZE', (0,1), (-1,-1), 8),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E0E0E0')),
+                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F8F9FA')]),
+                ('TOPPADDING', (0,0), (-1,-1), 5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
             ]))
             elements.append(t_detalle)
-            
-            if elementos_omitidos > 0:
+            if omitidos:
                 elements.append(Spacer(1, 0.1*inch))
                 elements.append(Paragraph(
-                    f"<i>Se omitieron {elementos_omitidos} periodos intermedios. Valor presente total: ${datos_bono['vp_total']:,.2f}</i>",
+                    f"<i>Nota: Se muestran 12 de {len(df)} periodos. La tabla completa está disponible en la app web.</i>",
                     description_style
                 ))
-    
-    # ============== PIE DE PÁGINA ==============
+
+        elements.append(PageBreak())
+
+    # ======== MÓDULO B: JUBILACIÓN (similar mejoras) ========
+    if datos_jubilacion:
+        elements.append(Paragraph("💰 MÓDULO 2: PLANIFICACIÓN DE JUBILACIÓN", section_style))
+        
+        elements.append(Paragraph(
+            "Este módulo calcula tu capacidad de retiro considerando impuestos y estructura de pagos. "
+            "La sostenibilidad de tu jubilación depende de la relación entre tu capital neto, "
+            "la inflación futura y tu esperanza de vida post-jubilación.",
+            description_style
+        ))
+
+        # Tabla resumen
+        impuesto_pct = (datos_jubilacion['impuesto'] / datos_jubilacion['ganancia'] * 100) if datos_jubilacion['ganancia'] > 0 else 0
+        resumen_jub = [
+            ['Concepto', 'Monto'],
+            ['Capital Bruto', f"${datos_jubilacion['capital_bruto']:,.2f}"],
+            ['Impuesto (29.5%)', f"${datos_jubilacion['impuesto']:,.2f}"],
+            ['<b>Capital Neto</b>', f"<b>${datos_jubilacion['capital_neto']:,.2f}</b>"],
+            ['Modalidad', datos_jubilacion['opcion_retiro']],
+        ]
+        if datos_jubilacion['opcion_retiro'] == 'Pensión Mensual':
+            resumen_jub.extend([
+                ['Plazo de Retiro', f"{datos_jubilacion['anos_retiro']} años"],
+                ['Pensión Mensual', f"${datos_jubilacion['pension_mensual']:,.2f}"],
+                ['Total Recibido', f"${datos_jubilacion['pension_mensual']*12*datos_jubilacion['anos_retiro']:,.2f}"],
+            ])
+
+        t_jub = Table(resumen_jub, colWidths=[3*inch, 2.8*inch])
+        t_jub.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#FFF8E1')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#5D4037')),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#FFECB3')),
+            ('BACKGROUND', (0,-3), (-1,-1), colors.HexColor('#FFECB3')) if 'Pensión' in datos_jubilacion.get('opcion_retiro','') else (),
+            ('FONTNAME', (0,-3), (-1,-1), 'Helvetica-Bold') if 'Pensión' in datos_jubilacion.get('opcion_retiro','') else (),
+        ]))
+        elements.append(t_jub)
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Insight
+        if datos_jubilacion['opcion_retiro'] == 'Pensión Mensual':
+            ratio = datos_jubilacion['pension_mensual'] / (datos_jubilacion['capital_neto'] / 12 / datos_jubilacion['anos_retiro']) if datos_jubilacion['capital_neto'] > 0 else 0
+            if ratio < 0.04:
+                insight = "<b>💡 Recomendación:</b> Tu tasa de retiro (4% anual) está dentro del rango seguro (3–4%)."
+            else:
+                insight = "<b>⚠️ Alerta:</b> Tu tasa de retiro supera el 4% anual. Considera extender el plazo o reducir la pensión."
+        else:
+            insight = "<b>🔍 Consideración:</b> El retiro total expone tu capital a riesgo de mercado posterior. Una pensión escalonada puede ser más eficiente fiscalmente."
+        elements.append(Paragraph(insight, insight_style))
+        elements.append(Spacer(1, 0.2*inch))
+
+        if 'grafico' in datos_jubilacion and datos_jubilacion['grafico']:
+            try:
+                img = Image(io.BytesIO(datos_jubilacion['grafico']), width=6.2*inch, height=2.8*inch)
+                elements.append(Paragraph("Estructura de Retiro Proyectado", description_style))
+                elements.append(img)
+            except:
+                pass
+        elements.append(PageBreak())
+
+    # ======== MÓDULO C: BONOS (con flujos detallados) ========
+    if datos_bono:
+        elements.append(Paragraph("📉 MÓDULO 3: VALORACIÓN DE BONOS", section_style))
+        
+        elements.append(Paragraph(
+            "La valoración de bonos se basa en el <b>Valor Presente de Flujos de Caja</b> (DCF), descontando "
+            "los cupones y valor nominal a la tasa de mercado. Un bono es atractivo cuando su VP > valor nominal.",
+            description_style
+        ))
+
+        diff = datos_bono['vp_total'] - datos_bono['valor_nominal']
+        diff_pct = diff / datos_bono['valor_nominal'] * 100
+        estado = "SUBVALUADO 🟢" if diff < 0 else "SOBREVALUADO 🔴" if diff > 0 else "A LA PAR ⚪"
+
+        resumen_bono = [
+            ['Parámetro', 'Valor'],
+            ['Valor Nominal', f"${datos_bono['valor_nominal']:,.2f}"],
+            ['Tasa Cupón', f"{datos_bono['tasa_cupon']:.2f}% anual"],
+            ['Plazo', f"{datos_bono['anos']} años"],
+            ['TEA de Mercado', f"{datos_bono['tea_mercado']:.2f}%"],
+            ['Valor Presente', f"${datos_bono['vp_total']:,.2f}"],
+            ['Diferencia', f"{diff:+,.2f} ({diff_pct:+.2f}%)"],
+            ['<b>Recomendación</b>', f"<b>{estado}</b>"],
+        ]
+
+        t_bono = Table(resumen_bono, colWidths=[3*inch, 2.8*inch])
+        t_bono.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F3E5F5')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#4A148C')),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CE93D8')),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#CE93D8')),
+            ('TEXTCOLOR', (0,-1), (-1,-1), colors.white),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ]))
+        elements.append(t_bono)
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Insight
+        if diff_pct < -5:
+            insight = "<b>🟢 Oportunidad:</b> El bono está subvaluado >5%. Podría generar ganancia de capital al vencimiento."
+        elif diff_pct > 5:
+            insight = "<b>🔴 Riesgo:</b> Prima de precio >5%. Solo justificable si buscas ingreso fijo y mantendrás hasta vencimiento."
+        else:
+            insight = "<b>⚪ Neutral:</b> Precio cercano a par. Evalúa según tu apetito por duración y flujo de caja."
+        elements.append(Paragraph(insight, insight_style))
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Gráfico
+        if 'grafico' in datos_bono and datos_bono['grafico']:
+            try:
+                img = Image(io.BytesIO(datos_bono['grafico']), width=6.2*inch, height=2.8*inch)
+                elements.append(Paragraph("Flujos de Caja Descontados", description_style))
+                elements.append(img)
+                elements.append(Spacer(1, 0.2*inch))
+            except:
+                pass
+
+        # Tabla detallada de flujos → ✅ AHORA SÍ SE MUESTRA
+        if 'df' in datos_bono and isinstance(datos_bono['df'], pd.DataFrame) and not datos_bono['df'].empty:
+            elements.append(Paragraph("Flujos de Caja Detallados (Cupones + Valor Nominal)", description_style))
+            
+            df = datos_bono['df']
+            if len(df) > 12:
+                df_show = pd.concat([df.head(6), df.tail(6)])
+                omitidos = len(df) - 12
+            else:
+                df_show = df
+                omitidos = 0
+            
+            data = [['Periodo', 'Flujo', 'Factor Desc.', 'VP del Flujo']]
+            for _, r in df_show.iterrows():
+                data.append([
+                    str(int(r['Periodo'])),
+                    f"${r['Flujo']:,.2f}",
+                    f"{r['Factor']:.4f}",
+                    f"${r['VP Flujo']:,.2f}"
+                ])
+            
+            if omitidos > 0:
+                data.insert(7, ['…', '…', '…', '…'])
+            
+            t_flujos = Table(data, colWidths=[1*inch, 1.6*inch, 1.6*inch, 2.6*inch])
+            t_flujos.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4A148C')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 9),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
+                ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+                ('FONTSIZE', (0,1), (-1,-1), 8),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E1BEE7')),
+                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F3E5F5')]),
+            ]))
+            elements.append(t_flujos)
+
+            vp_total_calc = df['VP Flujo'].sum()
+            elements.append(Spacer(1, 0.1*inch))
+            elements.append(Paragraph(
+                f"<i>Suma de VP de flujos: <b>${vp_total_calc:,.2f}</b> | Diferencia vs reportado: {abs(vp_total_calc - datos_bono['vp_total']):.2f}</i>",
+                description_style
+            ))
+
+    # ======== NOTA FINAL ========
     elements.append(Spacer(1, 0.5*inch))
     footer_style = ParagraphStyle(
         'Footer',
-        parent=styles['Normal'],
         fontSize=8,
-        textColor=colors.HexColor('#95A5A6'),
-        alignment=TA_CENTER
+        textColor=colors.HexColor('#6B7280'),
+        alignment=TA_CENTER,
+        fontName='Helvetica-Oblique'
     )
     elements.append(Paragraph(
-        "<i>Este reporte es generado automáticamente y tiene fines informativos. "
-        "Las proyecciones están basadas en los parámetros ingresados y no constituyen asesoría financiera.</i>",
+        "⚠️ <i>Este reporte es informativo y no constituye asesoría financiera, fiscal o legal. "
+        "Las proyecciones asumen estabilidad en tasas, inflación y marco regulatorio. "
+        "Recomendamos validar con un asesor certificado antes de tomar decisiones.</i>",
         footer_style
     ))
-    
+
+    # Generar PDF
     doc.build(elements)
     buffer.seek(0)
     return buffer
