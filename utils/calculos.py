@@ -21,7 +21,7 @@ def calcular_crecimiento_cartera(monto_inicial, aporte_periodico, tea, periodos_
         datos.append({
             'Periodo': periodo,
             'Aporte': aporte_periodico,
-            'Interés': round(interes, 2),
+            'Interes': round(interes, 2),
             'Saldo': round(saldo, 2),
             'Total Aportes': round(total_aportes, 2)
         })
@@ -75,4 +75,5 @@ def calcular_valor_bono(valor_nominal, tasa_cupon, frecuencia_pago, anos, tea_me
             'VP Flujo': round(vp_flujo, 2)
         })
     
+
     return pd.DataFrame(flujos), vp_total
