@@ -167,12 +167,40 @@ def mostrar_modulo_jubilacion():
             )
             
             st.plotly_chart(fig, use_container_width=True)
-            img_bytes = io.BytesIO()
-            fig.write_image(img_bytes, format="png")
-            img_bytes.seek(0)
-            st.session_state['jubilacion_grafico'] = img_bytes.getvalue()
-            st.write("Debug:", len(st.session_state['jubilacion_grafico']))
-
+            
+            # Guardar imagen para reporte con manejo de errores robusto
+            try:
+                img_bytes = io.BytesIO()
+                fig.write_image(img_bytes, format="png", width=1200, height=600)
+                img_bytes.seek(0)
+                st.session_state['jubilacion_grafico'] = img_bytes.getvalue()
+            except Exception as e:
+                # Fallback: intentar con matplotlib
+                try:
+                    import matplotlib.pyplot as plt
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    
+                    fig_mpl, ax = plt.subplots(figsize=(12, 6))
+                    ax.plot(meses, pension_acumulada, linewidth=3, color='#00CC96')
+                    ax.fill_between(meses, 0, pension_acumulada, alpha=0.3, color='#00CC96')
+                    ax.axhline(y=data['capital_neto'], linestyle='--', color='red', 
+                              label=f"Capital Inicial: ${data['capital_neto']:,.0f}")
+                    ax.set_xlabel('Mes', fontsize=12)
+                    ax.set_ylabel('Monto Acumulado (USD)', fontsize=12)
+                    ax.set_title('Proyección de Retiro Mensual', fontsize=14, fontweight='bold')
+                    ax.legend(fontsize=10)
+                    ax.grid(True, alpha=0.3)
+                    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+                    
+                    img_bytes = io.BytesIO()
+                    plt.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+                    img_bytes.seek(0)
+                    st.session_state['jubilacion_grafico'] = img_bytes.getvalue()
+                    plt.close()
+                except Exception as e2:
+                    # Si ambos fallan, no guardar imagen pero continuar
+                    st.session_state['jubilacion_grafico'] = None
 
         else:
             st.success(f"### 💰 Cobro Total: ${data['capital_neto']:,.2f}")
@@ -205,4 +233,3 @@ def mostrar_modulo_jubilacion():
             )
             
             st.plotly_chart(fig_comp, use_container_width=True)
-            
