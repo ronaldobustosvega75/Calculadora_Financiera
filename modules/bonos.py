@@ -158,14 +158,46 @@ def mostrar_modulo_bonos():
             template='plotly_white',
             hovermode='x unified'
         )
-
-        
         
         st.plotly_chart(fig, use_container_width=True)
-        img_bytes = io.BytesIO()
-        fig.write_image(img_bytes, format="png")
-        img_bytes.seek(0)
-        st.session_state['bono_grafico'] = img_bytes.getvalue()
+        
+        # Guardar imagen para reporte con manejo de errores robusto
+        try:
+            img_bytes = io.BytesIO()
+            fig.write_image(img_bytes, format="png", width=1200, height=600)
+            img_bytes.seek(0)
+            st.session_state['bono_grafico'] = img_bytes.getvalue()
+        except Exception as e:
+            # Fallback: intentar con matplotlib
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib
+                matplotlib.use('Agg')
+                
+                fig_mpl, ax = plt.subplots(figsize=(12, 6))
+                
+                # Gráfico de barras para flujos
+                ax.bar(df['Periodo'], df['Flujo'], alpha=0.6, label='Flujo de Caja', color='lightblue')
+                
+                # Línea para VP
+                ax.plot(df['Periodo'], df['VP Flujo'], 'ro-', linewidth=2, 
+                       markersize=8, label='VP de Flujo')
+                
+                ax.set_xlabel('Periodo', fontsize=12)
+                ax.set_ylabel('Monto (USD)', fontsize=12)
+                ax.set_title('Flujos de Caja y Valor Presente', fontsize=14, fontweight='bold')
+                ax.legend(fontsize=10)
+                ax.grid(True, alpha=0.3)
+                ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+                
+                img_bytes = io.BytesIO()
+                plt.savefig(img_bytes, format='png', dpi=150, bbox_inches='tight')
+                img_bytes.seek(0)
+                st.session_state['bono_grafico'] = img_bytes.getvalue()
+                plt.close()
+            except Exception as e2:
+                # Si ambos fallan, no guardar imagen pero continuar
+                st.session_state['bono_grafico'] = None
         
         with st.expander("📋 Ver Tabla Detallada de Flujos"):
             st.dataframe(df, use_container_width=True, hide_index=True)
